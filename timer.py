@@ -2,15 +2,27 @@ import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
 import time
 from datetime import datetime, timedelta
+import pygame
+from pygame import mixer
+import os
+import sys
+import winsound  # For Windows system sounds
 
 class TimeNotificationApp:
     def __init__(self):
+        # Initialize pygame mixer
+        pygame.init()
+        mixer.init()
+        
         # Main Window Setup
         self.main_window = tk.Tk()
         self.main_window.title("⏱️ TimeNotifier Pro")
-        self.main_window.geometry("400x300")
+        self.main_window.geometry("400x320")
         self.main_window.resizable(False, False)
         self.main_window.configure(bg='#2d2d2d')
+        
+        # Load sound files
+        self.setup_sounds()
         
         # Custom Styles
         self.setup_styles()
@@ -76,11 +88,71 @@ class TimeNotificationApp:
         )
         self.manual_btn.pack(side='left', padx=5)
         
+        # Sound toggle button
+        self.sound_btn = ttk.Button(
+            button_frame,
+            text="🔊 Sound ON",
+            command=self.toggle_sound,
+            style='Secondary.TButton'
+        )
+        self.sound_btn.pack(side='left', padx=5)
+        self.sound_enabled = True
+        
         # Timer state
         self.notification_time = None
         self.timer_running = False
         self.check_schedule()
         
+    def setup_sounds(self):
+        """Setup sound files or use system defaults"""
+        try:
+            # Try to load custom sounds
+            base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            
+            self.warning_sound = os.path.join(base_path, "warning.mp3")
+            self.timeout_sound = os.path.join(base_path, "timeout.mp3")
+            
+            # Verify files exist
+            if not os.path.exists(self.warning_sound):
+                self.warning_sound = None
+                print("Warning: warning.mp3 not found")
+            if not os.path.exists(self.timeout_sound):
+                self.timeout_sound = None
+                print("Warning: timeout.mp3 not found")
+                
+        except Exception as e:
+            print(f"Sound setup error: {e}")
+            self.warning_sound = None
+            self.timeout_sound = None
+    
+    def toggle_sound(self):
+        """Toggle sound on/off"""
+        self.sound_enabled = not self.sound_enabled
+        self.sound_btn.config(text="🔊 Sound ON" if self.sound_enabled else "🔇 Sound OFF")
+        if self.sound_enabled:
+            mixer.music.stop()  # Stop any currently playing sound
+        
+    def play_sound(self, sound_type):
+        """Play the appropriate sound effect"""
+        if not self.sound_enabled:
+            return
+            
+        try:
+            if sound_type == "warning":
+                if self.warning_sound:
+                    mixer.music.load(self.warning_sound)
+                    mixer.music.play()
+                elif sys.platform == "win32":
+                    winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
+            elif sound_type == "timeout":
+                if self.timeout_sound:
+                    mixer.music.load(self.timeout_sound)
+                    mixer.music.play()
+                elif sys.platform == "win32":
+                    winsound.PlaySound("SystemExit", winsound.SND_ALIAS)
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+
     def setup_styles(self):
         style = ttk.Style()
         style.theme_use('clam')
@@ -143,7 +215,9 @@ class TimeNotificationApp:
         """Start the default 30-second timer"""
         self.notification_time = datetime.now() + timedelta(seconds=30)
         self.timer_running = True
+        self.total_duration = 30
         self.update_display()
+        messagebox.showinfo("Timer Started", "30-second countdown started!")
         
     def manual_time_setup(self):
         # PIN verification
@@ -164,7 +238,12 @@ class TimeNotificationApp:
             minutes_to_add = 25 * multiplier
             self.notification_time = datetime.now() + timedelta(minutes=minutes_to_add)
             self.timer_running = True
+            self.total_duration = minutes_to_add * 60
             self.update_display()
+            messagebox.showinfo(
+                "Timer Set", 
+                f"Notification scheduled for {self.notification_time.strftime('%H:%M:%S')}"
+            )
     
     def update_display(self):
         if self.timer_running and self.notification_time:
@@ -182,13 +261,12 @@ class TimeNotificationApp:
             
             # Update status
             if total_seconds > 10:
-                self.status_label.config(text="Timer running...")
+                self.status_label.config(text="Timer running...", foreground='#6c757d')
             elif total_seconds > 0:
                 self.status_label.config(text="Almost done!", foreground='#ff9800')
             else:
                 self.status_label.config(text="TIME'S UP!", foreground='#ff5252')
                 self.timer_running = False
-                self.show_notification("TIME'S UP!", '#ff5252', 3000)
         else:
             self.time_label.config(text="00:00")
             self.status_label.config(text="Ready", foreground='#6c757d')
@@ -196,21 +274,27 @@ class TimeNotificationApp:
     
     def check_schedule(self):
         if self.timer_running and self.notification_time:
-            # Calculate total duration on first run
-            if not hasattr(self, 'total_duration'):
-                self.total_duration = (self.notification_time - datetime.now()).total_seconds()
-            
             remaining = (self.notification_time - datetime.now()).total_seconds()
             
             # Show 10-second warning
             if 9.9 < remaining <= 10.1 and not hasattr(self, 'warning_shown'):
                 self.show_notification("10 SECONDS LEFT!", '#ff9800', 5000)
+                self.play_sound("warning")
                 self.warning_shown = True
+                
+            # Show timeout notification
+            if remaining <= 0 and not hasattr(self, 'timeout_shown'):
+                self.show_notification("TIME'S UP!", '#ff5252', 3000)
+                self.play_sound("timeout")
+                self.timeout_shown = True
+                self.timer_running = False
             
             # Reset flags when timer is restarted
             if remaining > 10:
                 if hasattr(self, 'warning_shown'):
                     del self.warning_shown
+                if hasattr(self, 'timeout_shown'):
+                    del self.timeout_shown
         
         self.update_display()
         self.main_window.after(100, self.check_schedule)
@@ -233,7 +317,9 @@ class TimeNotificationApp:
             bg=bg_color,
             padx=20,
             pady=15,
-            highlightthickness=0
+            highlightthickness=0,
+            relief='solid',
+            borderwidth=0
         )
         main_frame.pack()
         
