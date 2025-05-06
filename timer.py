@@ -199,7 +199,10 @@ class FullscreenTimerApp:
         self.main_window.attributes('-fullscreen', fullscreen)
         self.main_window.attributes('-topmost', fullscreen)
         if not fullscreen:
-            self.main_window.geometry("400x300")
+            # Set reasonable window size when exiting fullscreen
+            self.main_window.geometry("600x400")
+            # Center the window on screen
+            self.main_window.eval('tk::PlaceWindow . center')
 
     def setup_keyboard_blocking(self):
         """Block keyboard shortcuts"""
@@ -273,6 +276,8 @@ class FullscreenTimerApp:
                 text="Ready", 
                 fg='#6c757d'
             ))
+            # Show the shutdown warning when resetting
+            self.show_shutdown_warning()
 
     def verify_pin_for_add_time(self):
         """Verify PIN for adding time"""
@@ -287,9 +292,12 @@ class FullscreenTimerApp:
         else:
             messagebox.showerror("Access Denied", "Incorrect PIN!", parent=self.main_window)
     
-    def show_time_options(self):
-        """Show time options"""
-        time_menu = tk.Toplevel(self.main_window)
+    def show_time_options(self, parent_window=None):
+        """Show time options menu (works for both main window and lock screen)"""
+        if parent_window is None:
+            parent_window = self.main_window
+        
+        time_menu = tk.Toplevel(parent_window)
         time_menu.title("Add Time")
         time_menu.geometry("300x200")
         time_menu.resizable(False, False)
@@ -308,26 +316,29 @@ class FullscreenTimerApp:
         btn_frame = tk.Frame(time_menu, bg='#2d2d2d')
         btn_frame.pack(pady=10)
         
+        # Custom Minutes button
         tk.Button(
             btn_frame,
             text="Custom Minutes",
-            command=lambda: [self.add_custom_minutes(), time_menu.destroy()],
+            command=lambda: [self.add_custom_time(parent_window, minutes=True), time_menu.destroy()],
             bg='#4CAF50',
             fg='white',
             font=('Arial', 12),
             width=15
         ).pack(pady=5)
         
+        # Custom Seconds button
         tk.Button(
             btn_frame,
             text="Custom Seconds",
-            command=lambda: [self.add_custom_seconds(), time_menu.destroy()],
+            command=lambda: [self.add_custom_time(parent_window, minutes=False), time_menu.destroy()],
             bg='#2196F3',
             fg='white',
             font=('Arial', 12),
             width=15
         ).pack(pady=5)
         
+        # Cancel button
         tk.Button(
             btn_frame,
             text="Cancel",
@@ -338,53 +349,65 @@ class FullscreenTimerApp:
             width=15
         ).pack(pady=5)
 
-    def add_custom_minutes(self):
-        """Add minutes"""
-        minutes = simpledialog.askinteger(
-            "Add Minutes", 
-            "Enter minutes to add:",
-            parent=self.main_window,
-            minvalue=1,
-            maxvalue=1000
-        )
+    def add_custom_time(self, parent_window, minutes=True):
+        """Add custom time (works for both main window and lock screen)"""
         if minutes:
-            self.add_time(minutes * 60)
-
-    def add_custom_seconds(self):
-        """Add seconds"""
-        seconds = simpledialog.askinteger(
-            "Add Seconds", 
-            "Enter seconds to add:",
-            parent=self.main_window,
-            minvalue=1,
-            maxvalue=3600
-        )
-        if seconds:
-            self.add_time(seconds)
-
-    def add_time(self, seconds_to_add):
-        """Add time to timer"""
-        if self.timer_running and self.notification_time:
-            self.notification_time += timedelta(seconds=seconds_to_add)
-            self.total_duration += seconds_to_add
+            time_str = simpledialog.askstring(
+                "Custom Minutes", 
+                "Enter minutes to add:",
+                parent=parent_window
+            )
+            try:
+                time_to_add = int(time_str)
+                if time_to_add < 1:
+                    raise ValueError
+                seconds_to_add = time_to_add * 60
+            except (ValueError, TypeError):
+                messagebox.showerror("Invalid Input", "Please enter a positive number", parent=parent_window)
+                return
         else:
-            self.notification_time = datetime.now() + timedelta(seconds=seconds_to_add)
-            self.total_duration = seconds_to_add
-            self.timer_running = True
+            time_str = simpledialog.askstring(
+                "Custom Seconds", 
+                "Enter seconds to add:",
+                parent=parent_window
+            )
+            try:
+                seconds_to_add = int(time_str)
+                if seconds_to_add < 1:
+                    raise ValueError
+            except (ValueError, TypeError):
+                messagebox.showerror("Invalid Input", "Please enter a positive number", parent=parent_window)
+                return
         
+        # Add the time and update the timer
+        self.notification_time = datetime.now() + timedelta(seconds=seconds_to_add)
+        self.total_duration = seconds_to_add
+        self.timer_running = True
+        self.timeout_shown = False
         self.five_min_warning_played = False
         self.timeout_sound_played = False
-        self.timeout_shown = False
         
+        # Exit fullscreen when time is added
         if self.is_fullscreen:
             self.set_fullscreen(False)
         
+        # If we're coming from the lock screen, close it
+        if parent_window != self.main_window and self.current_warning_window:
+            self.current_warning_window.destroy()
+            self.current_warning_window = None
+        
         self.update_display()
         
-        mins, secs = divmod(seconds_to_add, 60)
-        time_str = f"{mins} minutes" if mins > 0 else f"{secs} seconds"
+        # Show appropriate added time message
+        if minutes:
+            self.status_label.config(text=f"Added {time_to_add} minutes", fg='#4CAF50')
+        else:
+            mins, secs = divmod(seconds_to_add, 60)
+            if mins > 0:
+                self.status_label.config(text=f"Added {mins} minutes {secs} seconds", fg='#4CAF50')
+            else:
+                self.status_label.config(text=f"Added {secs} seconds", fg='#4CAF50')
         
-        self.status_label.config(text=f"Added {time_str}", fg='#4CAF50')
         self.main_window.after(2000, lambda: self.status_label.config(
             text="Timer running...", 
             fg='#6c757d'
@@ -564,7 +587,7 @@ class FullscreenTimerApp:
         
         tk.Button(
             warning,
-            text="➕ Add Time (1-30 minutes)",
+            text="➕ Add Time",
             command=lambda: self.verify_pin_for_add_time_warning(warning),
             bg='#4CAF50',
             fg='white',
@@ -576,7 +599,7 @@ class FullscreenTimerApp:
         self.shutdown_countdown(30, warning, countdown_label)
     
     def verify_pin_for_add_time_warning(self, warning_window):
-        """Verify PIN from warning"""
+        """Verify PIN from warning and show time options"""
         pin = simpledialog.askstring(
             "PIN Verification", 
             "Enter PIN to add time:",
@@ -584,37 +607,9 @@ class FullscreenTimerApp:
             show='*'
         )
         if pin == "062100!":
-            self.add_time_from_warning(warning_window)
+            self.show_time_options(warning_window)
         else:
             messagebox.showerror("Access Denied", "Incorrect PIN!", parent=warning_window)
-    
-    def add_time_from_warning(self, warning_window):
-        """Add time from warning"""
-        minutes_to_add = simpledialog.askinteger(
-            "Add Time", 
-            "Enter minutes to add (1-30):",
-            parent=warning_window,
-            minvalue=1,
-            maxvalue=30
-        )
-        
-        if minutes_to_add:
-            self.notification_time = datetime.now() + timedelta(minutes=minutes_to_add)
-            self.total_duration = minutes_to_add * 60
-            self.timer_running = True
-            self.timeout_shown = False
-            
-            if warning_window.winfo_exists():
-                warning_window.destroy()
-                self.current_warning_window = None
-                self.set_fullscreen(False)
-            
-            self.update_display()
-            self.status_label.config(text=f"Added {minutes_to_add} minutes", fg='#4CAF50')
-            self.main_window.after(2000, lambda: self.status_label.config(
-                text="Timer running...", 
-                fg='#6c757d'
-            ) if self.timer_running else None)
     
     def shutdown_countdown(self, seconds, window, label):
         """Shutdown countdown"""
@@ -624,7 +619,6 @@ class FullscreenTimerApp:
         elif window.winfo_exists():
             try:
                 os.system("shutdown /s /t 1")
-                #print("Shutdown command would execute here")
             except Exception as e:
                 messagebox.showerror("Shutdown Error", f"Failed to shutdown: {str(e)}")
 
