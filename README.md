@@ -1,7 +1,7 @@
 ⏱️ Fullscreen Timer Application
 A full-featured, fullscreen timer application built with Python and Tkinter, designed for computer rental shops or time-limited usage scenarios. Features PIN-protected time extension, system lockdown when time expires, and customizable time options.
 
-![timer Screenshot](ss.png) 
+![timer Screenshot](Screenshot_2.png) 
 
 ✨ Features
 🕒 Fullscreen Timer Display - Clean, large digital clock interface
