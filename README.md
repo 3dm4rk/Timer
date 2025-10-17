@@ -1,43 +1,27 @@
-# Timer
-manual timer
+⏱️ Fullscreen Timer Application
+A full-featured, fullscreen timer application built with Python and Tkinter, designed for computer rental shops or time-limited usage scenarios. Features PIN-protected time extension, system lockdown when time expires, and customizable time options.
 
+![timer Screenshot](ss.png) 
 
+✨ Features
+🕒 Fullscreen Timer Display - Clean, large digital clock interface
 
-Cool Features Added:
-Modern Dark Theme with blue accent colors
+🔒 PIN Protection - Secure PIN system for adding time and accessing settings
 
-Animated Progress Bar that depletes as time runs out
+⏰ Flexible Time Options - Pre-set time packages and custom time input
 
-Sleek Notification Cards with:
+🔊 Audio Notifications - Sound alerts for 5-minute warning and time expiration
 
-Shadow effects
+🛡️ System Lockdown - Fullscreen lock when time expires with shutdown countdown
 
-Smooth fade animations
+⌨️ Keyboard Blocking - Prevents unauthorized exit or system access
 
-Modern typography
+🎨 Customizable UI - Toggle between fullscreen and windowed modes
 
-Improved Visual Hierarchy:
+💰 Business Ready - Built-in pricing display (5 pesos for 25 minutes, 10 pesos for 50 minutes)
 
-Large time display (00:00 format)
+🚀 Installation
+Prerequisites
+Python 3.6 or higher
 
-Status messages with color coding
-
-Better spacing and padding
-
-Enhanced User Experience:
-
-Hover effects on buttons
-
-Clear visual feedback
-
-Professional font (Segoe UI)
-
-Responsive Design:
-
-Properly aligned elements
-
-Fixed window size for consistency
-
-Attention to detail in spacing
-
-The notifications now appear as modern "cards" that slide in with shadows, and the entire application has a cohesive dark theme that's easy on the eyes. The progress bar gives visual feedback about time remaining, and all the text uses a clean, modern font.
+Required packages: pygame, keyboard
